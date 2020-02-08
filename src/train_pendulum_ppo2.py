@@ -7,7 +7,10 @@ import baselines.logger
 import baselines.ppo2.ppo2 as ppo2
 import pdb
 #pdb.set_trace()
+# export OPENAI_LOGDIR=/tmp/blaa
+# export OPENAI_LOG_FORMAT='stdout,tensorboard'
 # python -m baselines.run --alg=ppo2 --env=Pendulum-v0 --num_timesteps=1e6 --save_path=pendulum_model_ppo2.pkl
+# python -m baselines.run --alg=ppo2 --env=Pendulum-v0 --nminibatches=32 --noptepochs=10 --num_env=12 --num_timesteps=4e6 --save_path=pendulum_model_ppo2.pkl --play
 # python -m baselines.run --alg=ppo2 --env=Pendulum-v0 --num_timesteps=0 --load_path=pendulum_model_ppo2.pkl --play
 def main():
     baselines.logger.configure(dir='/tmp/pendulum_ppo2', format_strs=['stdout', 'log', 'csv', 'tensorboard'])
@@ -31,8 +34,9 @@ def main():
         env=env,
         network='mlp',
         total_timesteps = 3e6,
-        eval_env = None, seed=None, nsteps=2048, ent_coef=0.0,
-        lr=lambda f : f * 2.5e-4,#3e-4,
+        eval_env = None, seed=seed, nsteps=2048, ent_coef=0.0,
+        lr=lambda f : f * 2.5e-4,
+        #lr=3e-4,
         vf_coef=0.5,  max_grad_norm=0.5, gamma=0.99, lam=0.95,
         log_interval=10, nminibatches=4,
         noptepochs=10, cliprange=0.2,
