@@ -13,15 +13,11 @@ import pdb
 # python -m baselines.run --alg=ppo2 --env=Pendulum-v0 --nminibatches=32 --noptepochs=10 --num_env=12 --num_timesteps=4e6 --save_path=pendulum_model_ppo2.pkl --play
 # python -m baselines.run --alg=ppo2 --env=Pendulum-v0 --num_timesteps=0 --load_path=pendulum_model_ppo2.pkl --play
 def main():
-    baselines.logger.configure(dir='/tmp/pendulum_ppo2', format_strs=['stdout', 'log', 'csv', 'tensorboard'])
+    baselines.logger.configure(dir='/tmp/glider_ppo2', format_strs=['stdout', 'log', 'csv', 'tensorboard'])
     #env = gym.make("pendulum-legacy-v0")
     #env = gym.make("Pendulum-v0")
-    if 0:
-        env_id = "Pendulum-v0"
-        env_type = "classic-control"
-    else:
-        env_id = "pendulum-legacy-v0"
-        env_type = "gym_poine"
+    env_id = "glider-v0"
+    env_type = "gym_poine"
     num_env = 12
     seed = 1234
     reward_scale = 1.
@@ -37,21 +33,21 @@ def main():
     act = ppo2.learn(
         env=env,
         network='mlp',
-        total_timesteps = 2e6,
+        total_timesteps = 100e6,
         eval_env = None, seed=seed, nsteps=2048, ent_coef=0.0,
-        #lr=lambda f : f * 2.5e-4,
-        lr=3e-4,
+        lr=lambda f : f * 2.5e-4,
+        #lr=3e-4,
         vf_coef=0.5,
         max_grad_norm=0.5,
-        gamma=0.99, # default 0.99
+        gamma=0.9, # default 0.99
         lam=0.95,
         log_interval=10,
         nminibatches=32, # default 4
         noptepochs=10, cliprange=0.2,
         save_interval=0, load_path=None, model_fn=None, update_fn=None, init_fn=None, mpi_rank_weight=1, comm=None,
     )
-    print("Saving model to pendulum_model_ppo2.pkl")
-    act.save("pendulum_model_ppo2.pkl")
+    print("Saving model to glider_model_ppo2.pkl")
+    act.save("glider_model_ppo2.pkl")
     
 
 if __name__ == '__main__':

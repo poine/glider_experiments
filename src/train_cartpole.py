@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
 import gym
 
 from baselines import deepq
@@ -15,7 +17,7 @@ def main():
         env,
         network='mlp',
         lr=1e-3,
-        total_timesteps=int(2e5),
+        total_timesteps=int(5e5),
         buffer_size=50000,
         exploration_fraction=0.1,
         exploration_final_eps=0.02,
