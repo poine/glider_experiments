@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """This solves the simple pendulum swing up problem presented here:
 
 http://hmc.csuohio.edu/resources/human-motion-seminar-jan-23-2014
