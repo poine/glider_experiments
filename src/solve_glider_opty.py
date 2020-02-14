@@ -2,45 +2,31 @@
 # -*- coding: utf-8 -*-
 """
 
-Optimal glider soaring trajectories
+Optimal Soaring Trajectories using Opty
+
+https://opty.readthedocs.io/en/latest/theory.html
 
 """
-import pickle
+import os, pickle
 
 from collections import OrderedDict
 
 import numpy as np
 import sympy as sym
 from opty.direct_collocation import Problem
-from opty.utils import building_docs
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
 import pat3.atmosphere as p3_atm
 import pat3.vehicles.fixed_wing.guidance_ardusoaring as p3_guid
 import pat3.plot_utils as p3_plu
 import pdb
 
-#target_angle = np.pi
-if 0:
-    duration = 20#120.0 # 10
-    num_nodes = 1000#4000 # 500
-else:
-    duration = 100#120.0 # 10
-    num_nodes = 5000#4000 # 500
-
-    
-interval_value = duration / (num_nodes - 1)
-print('interval_value: {:.3f}s ({:.1f}hz)'.format(interval_value, 1./interval_value))
-
-obj_last_z = False
-obj_summ_z = True
-obj_summ_z2 = False
+import glider_opty_utils as go_u
 
 
 # Symbolic equations of motion
 I, m, g, d, v, t = sym.symbols('I, m, g, d, v, t')
-atm_r, atm_s = sym.symbols('atm_r, atm_s')
+#atm_r, atm_s = sym.symbols('atm_r, atm_s')
 x, y, z, phi, psi = sym.symbols('x, y, z, phi, psi', cls=sym.Function)
 
 state_symbols = (x(t), y(t), z(t), psi(t))
@@ -51,130 +37,176 @@ specified_symbols = (phi(t),)
 par_map = OrderedDict()
 par_map[g] = 9.81
 par_map[v] = 8.0
-#par_map[atm_r] = 50.
-#par_map[atm_s] = 0.4
 
-#def atm_zd(_x, _y, _z, _t):
-#    return  par_map[atm_s]*sym.exp(-(_x**2 + _y**2)/par_map[atm_r]**2)
+def atm0(): return go_u.AtmosphereWharingtonSym(center=[0, 0, 0], radius=40, strength=1.)
+    
+def atm1():
+    centers, radiuses, strengths = ([-35, 0, 0], [35, 0, 0]), (30, 30), (1., 1.)
+    return go_u.AtmosphereWharingtonArraySym(centers, radiuses, strengths)
 
-class AtmosphereWharingtonSym(p3_atm.AtmosphereWharington):
-    def get_wind_sym(self, _x, _y, _z, _t):
-        return  self.strength*sym.exp(-(_x**2 + _y**2)/self.radius**2)
+def atm2():
+    centers, radiuses, strengths = ([-50, 0, 0], [50, 0, 0]), (25, 25), (1., 1.)
+    return go_u.AtmosphereWharingtonArraySym(centers, radiuses, strengths)
 
-atm = AtmosphereWharingtonSym(center=[0, 0, 0], radius=40, strength=0.4)
-
-
-#netto_vario = p3_guid.NettoVario()
-def glider_zd(va, phi):
-    polar_K   =  49.5050092764    # 25.6   # Cl factor 2*m*g/(rho*S) @Units: m.m/s/s
-    polar_CD0 =   0.0122440667444 #  0.027 # Zero lift drag coef
-    polar_B   =   0.0192172535765 #  0.031 # Induced drag coeffient
-    CL0 =  polar_K / va**2
-    C1 = polar_CD0 / CL0  # constant describing expected angle to overcome zero-lift drag
-    C2 = polar_B * CL0
-    return -va * (C1 + C2 / sym.cos(phi)**2)
-
-
-eom = sym.Matrix([x(t).diff()   - v * sym.cos(psi(t)),
-                  y(t).diff()   - v * sym.sin(psi(t)),
-                  z(t).diff() - atm.get_wind_sym(x(t), y(t), z(t), t) - glider_zd(par_map[v], phi(t)),
-#                  z(t).diff() - atm_zd(x(t), y(t), z(t), t) - glider_zd(par_map[v], phi(t)), 
-                  psi(t).diff() - g / v * sym.tan(phi(t))])
+def atm3():
+    centers, radiuses, strengths = ([-30, 10, 0], [30, 10, 0], [0, -32, 0]), (25, 25, 25), (0.4, 0.4, 0.4)
+    atm = go_u.AtmosphereWharingtonArraySym(centers, radiuses, strengths)
+    return atm
+   
+#atm = atm0()
+#atm = atm1()
+#atm = atm2()
 
 
 
-# Specify the objective function and it's gradient.
+def get_eom(__atm):
+    return sym.Matrix([x(t).diff()   - v * sym.cos(psi(t)),
+                       y(t).diff()   - v * sym.sin(psi(t)),
+                       z(t).diff() - __atm.get_wind_sym(x(t), y(t), z(t), t) - go_u.glider_sink_rate(par_map[v], phi(t)),
+                       psi(t).diff() - g / v * sym.tan(phi(t))])
 
 
-def obj(free):
-    """Minimize the sum of the squares of the control torque."""
-    #pdb.set_trace()
-    #T = free[2 * num_nodes:]
-    #return interval_value * np.sum(T**2)
-    if obj_summ_z:
-        _zs = free[2*num_nodes:3*num_nodes]
-        return -interval_value * np.sum(_zs)
-    if obj_summ_z2:
-        _zs = free[2*num_nodes:3*num_nodes]
-        return -interval_value * np.sum(_zs**2)
-    if obj_last_z:
-        _zs = free[2*num_nodes:3*num_nodes]
-        return -_zs[-1]
+# Specify the objective function and its gradient.
 
-def obj_grad(free):
+# mean altitude
+def obj_sum_z(_num_nodes, _scale, free):
+    return -_scale * np.sum(free[2*_num_nodes:3*_num_nodes])
+def obj_grad_sum_z(_num_nodes, _scale, free):
     grad = np.zeros_like(free)
-    #grad[2 * num_nodes:] = 2.0 * interval_value * free[2 * num_nodes:]
-    if obj_summ_z:
-        grad[2*num_nodes:3*num_nodes] = -1.0 * interval_value
-    if obj_summ_z2:
-        grad[2*num_nodes:3*num_nodes] = -2.0 * interval_value * free[2*num_nodes:3*num_nodes]
-    if obj_last_z:
-        grad[3*num_nodes-1] = -1
+    grad[2*_num_nodes:3*_num_nodes] = -1.0 * _scale
     return grad
 
-# Specify the symbolic instance constraints, i.e. initial and end
-# conditions.
-instance_constraints = (x(0.0), y(0.0)-50, z(0.), psi(0.))
-                        #theta(duration) - target_angle,
+# mean squared altitude
+def obj_sum_z2(_num_nodes, _scale, free):
+    return -_scale * np.sum(free[2*_num_nodes:3*_num_nodes]**2)
+def obj_grad_sum_z2(_num_nodes, _scale, free):
+    grad = np.zeros_like(free)
+    grad[2*_num_nodes:3*_num_nodes] = -2.0 * _scale * free[2*num_nodes:3*num_nodes]
+    return grad
+
+# final altitude
+def obj_final_z(_num_nodes, _scale, free):
+    return -_scale * free[3*_num_nodes-1]
+def obj_grad_final_z(_num_nodes, _scale, free):
+    grad = np.zeros_like(free)
+    grad[3*_num_nodes-1] = -_scale
+    return grad
+
+
+# cross country
+def obj_cc(_num_nodes, _scale, free):
+    return -_scale * np.sum(free[0*_num_nodes:1*_num_nodes])
+def obj_grad_cc(_num_nodes, _scale, free):
+    grad = np.zeros_like(free)
+    grad[0*_num_nodes:1*_num_nodes] = -1.0 * _scale
+    return grad
 
 
 
-def compute_solution():
-   
-    # Create an optimization problem.
-    prob = Problem(obj, obj_grad, eom, state_symbols, num_nodes, interval_value,
-                   known_parameter_map=par_map,
-                   instance_constraints=instance_constraints,
-                   bounds={phi(t): (-np.deg2rad(30), np.deg2rad(30))})
+class Planner:
+    def __init__(self,
+                 _obj_fun=obj_final_z, _obj_grad=obj_grad_final_z,
+                 _atm=None,
+                 _min_bank=-np.deg2rad(45.), _max_bank=np.deg2rad(45.),
+                 x0=-25, y0=0, z0=1, psi0=0):
+        self.duration  =   40
+        self.num_nodes = 2000 # time discretization
+        self.interval_value = self.duration / (self.num_nodes - 1)
+        print('solver: interval_value: {:.3f}s ({:.1f}hz)'.format(self.interval_value, 1./self.interval_value))
+        self.atm = _atm if _atm is not None else atm0()
 
-    # https://coin-or.github.io/Ipopt/OPTIONS.html
-    prob.addOption('tol', 1e-7)       # default 1e-8
-    prob.addOption('max_iter', 5000)  # default 3000
-    #prob.addOption('mehrotra_algorithm', 'yes')  # default 'no'
-    #prob.addOption('mu_strategy', 'adaptive')  # default 'monotone'
-    
-    # Use a random positive initial guess.
-    initial_guess = np.random.randn(prob.num_free)
+        self._slice_x   = slice(0*self.num_nodes, 1*self.num_nodes, 1)
+        self._slice_y   = slice(1*self.num_nodes, 2*self.num_nodes, 1)
+        self._slice_z   = slice(2*self.num_nodes, 3*self.num_nodes, 1)
+        self._slice_psi = slice(3*self.num_nodes, 4*self.num_nodes, 1)
+        self._slice_phi = slice(4*self.num_nodes, 5*self.num_nodes, 1)
 
-    # Find the optimal solution.
-    solution, info = prob.solve(initial_guess)
 
-    return prob, solution
-    
+        # Specify the symbolic instance constraints, i.e. initial and end conditions.
+        instance_constraints = (x(0.0)-x0, y(0.0)-y0, z(0.)-z0, psi(0.)-psi0)
+        #theta(duration) - target_angle,
+        bounds = {phi(t): (_min_bank, _max_bank)}
+        #bounds = {phi(t): (-0.1, _max_bank)}
+        # Create an optimization problem.
+        self.prob = Problem(lambda _free: _obj_fun(self.num_nodes, self.interval_value, _free),
+                            lambda _free: _obj_grad(self.num_nodes, self.interval_value, _free),
+                            #eom,
+                            get_eom(self.atm),
+                            state_symbols, self.num_nodes, self.interval_value,
+                            known_parameter_map=par_map,
+                            instance_constraints=instance_constraints,
+                            bounds=bounds,
+                            parallel=False)
+
+    def configure(self, tol=1e-8, max_iter=3000):
+        # https://coin-or.github.io/Ipopt/OPTIONS.html
+        self.prob.addOption('tol', tol)            # default 1e-8
+        self.prob.addOption('max_iter', max_iter)  # default 3000
+
+    def run(self):
+
+        # Use a random positive initial guess.
+        initial_guess = np.random.randn(self.prob.num_free)
+        # Find the optimal solution.
+        self.solution, info = self.prob.solve(initial_guess)
+        self.interpret_solution()
+        
+    def interpret_solution(self):
+        self.sol_time = np.linspace(0.0, self.duration, num=self.num_nodes)
+        self.sol_x = self.solution[self._slice_x]
+        self.sol_y = self.solution[self._slice_y]
+        self.sol_z = self.solution[self._slice_z]
+        self.sol_psi = self.solution[self._slice_psi]
+        self.sol_phi = self.solution[self._slice_phi]
+        self.sol_v = par_map[v]*np.ones(self.num_nodes)
+        
+    def save_solution(self, filename):
+        print('saving {}'.format(filename))
+        pickle.dump(self.solution, open(filename, "wb"))
+
+    def load_solution(self, filename):
+        print('loading {}'.format(filename))
+        self.solution = pickle.load(open(filename, "rb"))
+        self.interpret_solution()
+
+    def run_or_load(self, filename, force_run=False):
+        if force_run or not os.path.exists(filename):
+            self.run()
+            self.save_solution(filename)
+        else:
+            self.load_solution(filename)
+        
+
 
 def plot_solve(prob, solution):
     prob.plot_trajectories(solution)
     #prob.plot_constraint_violations(solution)
     prob.plot_objective_value()
 
-def plot_solution(solution, atm):
-    time = np.linspace(0.0, duration, num=num_nodes)
-    _x, _y = solution[:num_nodes], solution[num_nodes:2*num_nodes] 
-    #fig = plt.figure()
-    #ax = fig.add_subplot(111, aspect='equal')
-    p3_plu.plot_slice_wind_ne(atm, n0=-100, n1=100, dn=5., e0=-100., e1=100, de=5, h0=0., t0=0.)
-    plt.plot(_x, _y)
-    plt.gca().axis('equal')
+
+def plot_run(planner, figure=None, ax=None):
+    fig = figure if figure is not None else plt.figure()
+    ax = ax if ax is not None else fig.add_subplot(111)
+    planner.prob.plot_objective_value()
+    return ax, figure
+
+def main(force_recompute=False, filename='/tmp/glider_opty.pkl'):
+    _atm = go_u.AtmosphereWharingtonSym(center=[0, 0, 0], radius=40, strength=1.)
+    _atm.center = np.array([-20, 0, 0])
+    _atm.strength = 2.
+    _atm.radius = 20.
+    _p = Planner(_atm=_atm, x0=-50)#obj_cc, obj_grad_cc)#_min_bank=np.deg2rad(-10))
+    _p.configure(tol=1e-8, max_iter=200)
+    _p.run_or_load(filename, force_recompute)
+    plot_run(_p)
+    alt_final, alt_mean = _p.sol_z[-1], np.mean(_p.sol_z)
+    txt = 'alt: final {:.1f} m, mean {:.1f}'.format(alt_final, alt_mean)
+    go_u.plot_solution_chronogram(_p)
+    go_u.plot_solution_2D_en(_p, title=txt)
+    go_u.plot_solution_2D_nu(_p, title=txt)
+    go_u.plot_solution_3D(_p, title=txt)
     plt.show()
-
-def save_solution(filename, solution):
-    print('saving {}'.format(filename))
-    pickle.dump( solution, open(filename, "wb"))
-
-def load_solution(filename):
-    print('loading {}'.format(filename))
-    solution = pickle.load( open(filename, "rb"))
-    return solution
-
-def main():
-    if 1:
-        prob, solution = compute_solution()
-        save_solution('/tmp/glider_opty.pkl', solution)
-        plot_solve(prob, solution)
-        plot_solution(solution, atm)
-    else:
-        solution = load_solution('/tmp/glider_opty.pkl')
-        plot_solution(solution, atm)
-
+    
 if __name__ == '__main__':
-    main()
+    main(force_recompute=True)
+    #atm2()
