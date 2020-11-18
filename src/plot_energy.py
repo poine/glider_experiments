@@ -15,11 +15,9 @@ import pat3.vehicles.fixed_wing.guidance as p3_guid
 def main():
     # Read aircraft trajectory and control variables from a file
     ctl_logger = p3_guid.GuidancePurePursuitLogger()
-    time, X, U = ctl_logger.load('/tmp/pat_glider_ds.npz')
+    time, X, U = ctl_logger.load('/tmp/pat_glider_slope_soaring.npz')
     # This is needed :(
     atm = p3_atm.AtmosphereShearX(wind1=7.0, wind2=-1.0, xlayer=60.0, zlayer=40.0)
-    # Plot aircraft trajectory
-    p1_fw_dyn.plot_trajectory_ae(time, X, U, window_title='chronogram', atm=atm)
     # Convert aircraft trajectory to euclidian/euler state vector
     Xee = np.array([p3_fr.SixDOFAeroEuler.to_six_dof_euclidian_euler(_X, atm, _t) for _X, _t in zip(X, time)])
     # Compute energy
@@ -28,9 +26,16 @@ def main():
     mass, g = 1., 9.81  # we can get that from the cularis dynamic model if needed, as well as inertia
     kinetic_energy = 0.5*mass*inertial_vel_norm**2
     pos_ned = Xee[:,p3_fr.SixDOFEuclidianEuler.sv_slice_pos]
-    potential_energy = mass*g*-pos_ned[:,2]
+    potential_energy = mass*g*-Xee[:,p3_fr.SixDOFEuclidianEuler.sv_z]
     #pdb.set_trace()
-
+    
+    # Plot aircraft trajectory
+    #p1_fw_dyn.plot_trajectory_ae(time, X, U, window_title='chronogram', atm=atm)
+    _ctl=None# not needed
+    ctl_logger.plot_chronograms(time, X, U, _ctl, atm)
+    ctl_logger.plot3D(time, X, _ctl, atm)
+    ctl_logger.plot_slice_nu(time, X, U, _ctl, atm, ref_traj=None, n0=0, n1=210, dn=10, h0=0, h1=80, dh=10)
+    # Plot energy
     plt.figure()
     plt.plot(time, kinetic_energy, label='kinetic energy')
     plt.plot(time, potential_energy, label='potential energy')
