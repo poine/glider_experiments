@@ -76,7 +76,7 @@ class Planner:
     def get_eom(self, g=9.81):
         eq1 = self._sx(self._st).diff() - self._sv(self._st) * sym.cos(self._spsi(self._st))
         eq2 = self._sy(self._st).diff() - self._sv(self._st) * sym.sin(self._spsi(self._st))
-        eq3 = self._sz(self._st).diff() - self.atm.get_wind_sym(self._sx(self._st), self._sy(self._st), self._sz(self._st), self._st)\
+        eq3 = self._sz(self._st).diff() - self.atm.get_wind_ned_sym(self._sx(self._st), self._sy(self._st), self._sz(self._st), self._st)\
                                         - go_u.glider_sink_rate(self._sv(self._st), self._sphi(self._st))
         eq4 = self._spsi(self._st).diff() - g / self._sv(self._st) * sym.tan(self._sphi(self._st))
         return sym.Matrix([eq1, eq2, eq3, eq4])

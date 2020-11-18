@@ -52,7 +52,10 @@ def atm3():
     centers, radiuses, strengths = ([-30, 10, 0], [30, 10, 0], [0, -32, 0]), (25, 25, 25), (0.4, 0.4, 0.4)
     atm = go_u.AtmosphereWharingtonArraySym(centers, radiuses, strengths)
     return atm
-   
+
+def atm4():
+    pass
+    
 #atm = atm0()
 #atm = atm1()
 #atm = atm2()
@@ -62,7 +65,7 @@ def atm3():
 def get_eom(__atm):
     return sym.Matrix([x(t).diff()   - v * sym.cos(psi(t)),
                        y(t).diff()   - v * sym.sin(psi(t)),
-                       z(t).diff() - __atm.get_wind_sym(x(t), y(t), z(t), t) - go_u.glider_sink_rate(par_map[v], phi(t)),
+                       z(t).diff() - __atm.get_wind_ned_sym(x(t), y(t), z(t), t) - go_u.glider_sink_rate(par_map[v], phi(t)),
                        psi(t).diff() - g / v * sym.tan(phi(t))])
 
 
@@ -125,7 +128,8 @@ class Planner:
         # Specify the symbolic instance constraints, i.e. initial and end conditions.
         instance_constraints = (x(0.0)-x0, y(0.0)-y0, z(0.)-z0, psi(0.)-psi0)
         #theta(duration) - target_angle,
-        bounds = {phi(t): (_min_bank, _max_bank)}
+        bounds = {phi(t): (_min_bank, _max_bank),
+                  y(t): (-50, 50)}
         #bounds = {phi(t): (-0.1, _max_bank)}
         # Create an optimization problem.
         self.prob = Problem(lambda _free: _obj_fun(self.num_nodes, self.interval_value, _free),
@@ -191,12 +195,16 @@ def plot_run(planner, figure=None, ax=None):
     return ax, figure
 
 def main(force_recompute=False, filename='/tmp/glider_opty.pkl'):
-    _atm = go_u.AtmosphereWharingtonSym(center=[0, 0, 0], radius=40, strength=1.)
-    _atm.center = np.array([-20, 0, 0])
-    _atm.strength = 2.
-    _atm.radius = 20.
-    _p = Planner(_atm=_atm, x0=-50)#obj_cc, obj_grad_cc)#_min_bank=np.deg2rad(-10))
-    _p.configure(tol=1e-8, max_iter=200)
+    if 1:
+        _atm = go_u.AtmosphereWharingtonSym(center=[0, 0, 0], radius=40, strength=1.)
+        _atm.center = np.array([-20, 0, 0])
+        _atm.strength = 2.
+        _atm.radius = 20.
+    else:
+        _atm = go_u.AtmosphereRidgeSym()
+        
+    _p = Planner(_atm=_atm, x0=0, z0=20., psi0=np.pi/2)#obj_cc, obj_grad_cc)#_min_bank=np.deg2rad(-10))
+    _p.configure(tol=1e-8, max_iter=1000)
     _p.run_or_load(filename, force_recompute)
     plot_run(_p)
     alt_final, alt_mean = _p.sol_z[-1], np.mean(_p.sol_z)
@@ -209,4 +217,4 @@ def main(force_recompute=False, filename='/tmp/glider_opty.pkl'):
     
 if __name__ == '__main__':
     main(force_recompute=True)
-    #atm2()
+    
