@@ -15,7 +15,7 @@ import pat3.vehicles.fixed_wing.guidance as p3_guid
 def main():
     # Read aircraft trajectory and control variables from a file
     ctl_logger = p3_guid.GuidancePurePursuitLogger()
-    time, X, U = ctl_logger.load('/tmp/pat_glider_slope_soaring.npz')
+    time, X, U = ctl_logger.load('/tmp/pat_glider_ds.npz')
     # This is needed :(
     atm = p3_atm.AtmosphereShearX(wind1=7.0, wind2=-1.0, xlayer=60.0, zlayer=40.0)
     # Convert aircraft trajectory to euclidian/euler state vector
@@ -23,7 +23,7 @@ def main():
     # Compute energy
     inertial_vel_ned = Xee[:,p3_fr.SixDOFEuclidianEuler.sv_slice_vel]
     inertial_vel_norm = np.linalg.norm(inertial_vel_ned, axis=1)
-    mass, g = 1., 9.81  # we can get that from the cularis dynamic model if needed, as well as inertia
+    mass, g = 1.7, 9.81  # we can get that from the cularis dynamic model if needed, as well as inertia
     kinetic_energy = 0.5*mass*inertial_vel_norm**2
     pos_ned = Xee[:,p3_fr.SixDOFEuclidianEuler.sv_slice_pos]
     potential_energy = mass*g*-Xee[:,p3_fr.SixDOFEuclidianEuler.sv_z]
