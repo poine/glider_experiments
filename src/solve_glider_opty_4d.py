@@ -20,18 +20,18 @@ import glider_opty_utils as go_u
 import pat3.plot_utils as p3_plu
 
 # final altitude
-def obj_final_z(_num_nodes, _scale, free):
-    return _scale * free[3*_num_nodes-1]
-def obj_grad_final_z(_num_nodes, _scale, free):
+def obj_final_z(free, _p):
+    return _p.obj_scale * free[_p._slice_z][-1]
+def obj_grad_final_z(free, _p):
     grad = np.zeros_like(free)
-    grad[3*_num_nodes-1] = _scale
+    grad[_p._slice_z][-1] = _p.obj_scale
     return grad
 # mean altitude
-def obj_sum_z(_num_nodes, _scale, free):
-    return _scale * np.sum(free[2*_num_nodes:3*_num_nodes])/_num_nodes
-def obj_grad_sum_z(_num_nodes, _scale, free):
+def obj_sum_z(free, _p):
+    return _p.obj_scale * np.sum(free[_p._slice_z])/_p.num_nodes
+def obj_grad_sum_z(free, _p):
     grad = np.zeros_like(free)
-    grad[2*_num_nodes:3*_num_nodes] = _scale/_num_nodes
+    grad[_p._slice_z] = _p.obj_scale/_p.num_nodes
     return grad
 
 
@@ -45,11 +45,11 @@ class Glider:
         self._input_symbols = (self._sv, self._sphi)
 
     def get_eom(self, atm, g=9.81):
-        eq1 = self._sx(self._st).diff() - self._sv(self._st) * sym.cos(self._spsi(self._st))
-        eq2 = self._sy(self._st).diff() - self._sv(self._st) * sym.sin(self._spsi(self._st))
+        wn, we, wd = atm.get_wind_ned_sym2(self._sx(self._st), self._sy(self._st), self._sz(self._st), self._st)
+        eq1 = self._sx(self._st).diff() - self._sv(self._st) * sym.cos(self._spsi(self._st)) -wn
+        eq2 = self._sy(self._st).diff() - self._sv(self._st) * sym.sin(self._spsi(self._st)) -we
         eq3 = self._sz(self._st).diff()\
-              -atm.get_wind_ned_sym(self._sx(self._st), self._sy(self._st), self._sz(self._st), self._st)\
-              -go_u.glider_sink_rate(self._sv(self._st), self._sphi(self._st))
+              -wd -go_u.glider_sink_rate(self._sv(self._st), self._sphi(self._st))
         eq4 = self._spsi(self._st).diff() - g / self._sv(self._st) * sym.tan(self._sphi(self._st))
         return sym.Matrix([eq1, eq2, eq3, eq4])
     
@@ -58,13 +58,16 @@ class Planner:
     def __init__(self,
                  _obj_fun=obj_final_z, _obj_grad=obj_grad_final_z,
                  _atm=None,
-                 _min_bank=-np.deg2rad(60.), _max_bank=np.deg2rad(60.),
-                 _min_v=7., _max_v=20.,
+                 _phi_constraint = (-np.deg2rad(60.), np.deg2rad(60.)), #_min_bank=-np.deg2rad(60.), _max_bank=np.deg2rad(60.),
+                 _v_constraint = (7., 20.),                             # velocity constraint
+                 _n_constraint = (-100, 100),
+                 _e_constraint = (-100, 100),
                  x0=-25, y0=0, z0=1, psi0=0,
-                 duration=40., hz=50.):
-        self.duration  = duration
+                 duration=40., hz=50., obj_scale=1.):
+        self.obj_scale = obj_scale
         self.num_nodes = int(duration*hz)+1
         self.interval_value = 1./hz
+        self.duration  = (self.num_nodes-1)*self.interval_value#duration
         print('solver: interval_value: {:.3f}s ({:.1f}hz)'.format(self.interval_value, 1./self.interval_value))
         self.atm = _atm if _atm is not None else go_u.AtmosphereWharingtonSym()
 
@@ -82,18 +85,18 @@ class Planner:
         #self._par_map[g] = 9.81
         #self._par_map[v] = 8.0
 
-        scale=100.#-0.1#-1.#-10.
+        #scale=100.#-0.1#-1.#-10.
         
         # Specify the symbolic instance constraints, i.e. initial and end conditions.
         self._instance_constraints = (_g._sx(0.)-x0, _g._sy(0.)-y0, _g._sz(0.)-z0, _g._spsi(0.)-psi0)
 
-        self._bounds = {_g._sphi(_g._st): (_min_bank, _max_bank),
-                        _g._sv(_g._st): (_min_v, _max_v),
-                        _g._sx(_g._st): (-50, 10),
-                        _g._sy(_g._st): (-35, 35)
+        self._bounds = {_g._sphi(_g._st): _phi_constraint, #(_min_bank, _max_bank),
+                        _g._sv(_g._st): _v_constraint, #(_min_v, _max_v),
+                        _g._sx(_g._st): _n_constraint, #(-50, 10),
+                        _g._sy(_g._st): _e_constraint, #(-35, 35)
         }
-        self.prob =  opty.direct_collocation.Problem(lambda _free: _obj_fun(self.num_nodes, scale, _free),
-                                                     lambda _free: _obj_grad(self.num_nodes, scale, _free),
+        self.prob =  opty.direct_collocation.Problem(lambda _free: _obj_fun(_free, self),
+                                                     lambda _free: _obj_grad(_free, self),
                                                      _g.get_eom(self.atm),
                                                      _g._state_symbols,
                                                      self.num_nodes,
@@ -104,9 +107,9 @@ class Planner:
                                                      parallel=False)
         
 
-    def run(self):
+    def run(self, initial_guess=None):
         # Use a random positive initial guess.
-        initial_guess = np.random.randn(self.prob.num_free)
+        initial_guess = np.random.randn(self.prob.num_free) if initial_guess is None else initial_guess
         # Find the optimal solution.
         self.solution, info = self.prob.solve(initial_guess)   
         self.interpret_solution()
@@ -160,8 +163,16 @@ def check_atm(_p):
     p3_plu.decorate(axes[1], title="north up slice, symbolic", xlab='north in m', ylab='h in m (positive up)')
     plt.show()
         
-def compute_or_load():
-    pass
+def compute_or_load(atm, _p, force_recompute=False, filename='/tmp/glider_opty_4d.pkl', tol=1e-5, max_iter=1500, initial_guess=None):
+    if force_recompute:
+        _p.configure(tol, max_iter)
+        _p.run(initial_guess)
+        _p.prob.plot_objective_value()
+        #_p.prob.plot_trajectories(_p.solution)
+        #_p.prob.plot_constraint_violations(_p.solution)
+        _p.save_solution(filename)
+    else:
+        _p.load_solution(filename)
         
 def main(force_recompute=False, filename='/tmp/glider2_opty.pkl'):
     #atm = go_u.AtmosphereWharingtonSym(radius=40., strength=-1)
@@ -172,19 +183,11 @@ def main(force_recompute=False, filename='/tmp/glider2_opty.pkl'):
                   _obj_fun=obj_sum_z, _obj_grad=obj_grad_sum_z,
                   #_atm=atm, x0=20, y0=0, z0=-35, psi0=np.pi,
                   _atm=atm, x0=10, y0=0, z0=-25, psi0=np.pi,
-                  duration=100, hz=50.)
+                  duration=50, hz=50.)
 
     #check_atm(_p)
     filename = '/tmp/glider_slope_soaring_opty1.npz'
-    if force_recompute:
-        _p.configure(tol=1e-5, max_iter=1500)
-        _p.run()
-        _p.prob.plot_objective_value()
-        _p.prob.plot_trajectories(_p.solution)
-        #_p.prob.plot_constraint_violations(_p.solution)
-        _p.save_solution(filename)
-    else:
-        _p.load_solution(filename)
+    compute_or_load(atm, _p, force_recompute, filename, tol=1e-5, max_iter=1500, initial_guess=None)
     go_u.plot_solution_chronogram(_p)
     go_u.plot_solution_2D_en(_p)
     go_u.plot_solution_2D_nu(_p, n0=-40, n1=50, dn=5., e0=0., h0=0., h1=70, dh=2.5)

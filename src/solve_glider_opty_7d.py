@@ -10,14 +10,15 @@ Optimal Soaring Trajectories using Opty
 https://opty.readthedocs.io/en/latest/theory.html
 
 """
-import sys, numpy as np, sympy as sym
+import os, sys, logging, numpy as np, sympy as sym
 import matplotlib.pyplot as plt
 import collections
 import pdb
 
 import opty.direct_collocation
 import glider_opty_utils as go_u
-import pat3.plot_utils as p3_plu
+import pat3.utils as p3_u, pat3.plot_utils as p3_plu
+import pat3.vehicles.fixed_wing.simple_6dof_fdm_param as p3_fw_dynp
 
 # final altitude
 def obj_final_z(_num_nodes, _scale, free):
@@ -26,6 +27,18 @@ def obj_grad_final_z(_num_nodes, _scale, free):
     grad = np.zeros_like(free)
     grad[3*_num_nodes-1] = _scale
     return grad
+
+
+# Symboliv version
+def R_aero_to_body(alpha, beta):
+    """
+    computes the aero to body rotation matrix
+    """
+    ca, sa = sym.cos(alpha), sym.sin(alpha) 
+    cb, sb = sym.cos(beta), sym.sin(beta)
+    return sym.Array([[ca*cb, -ca*sb, -sa],
+                      [sb   ,  cb   ,  0.],
+                      [sa*cb, -sa*sb,  ca]])
 
 class Glider:
     sv_x, sv_y, sv_z, sv_xd, sv_yd, sv_zd, sv_psi = range(7)
@@ -37,6 +50,7 @@ class Glider:
         self._state_symbols = (self._sx(self._st), self._sy(self._st), self._sz(self._st),
                                self._sxd(self._st), self._syd(self._st), self._szd(self._st), self._spsi(self._st))
         #self._input_symbols = (self._sv, self._sphi)
+        self.P = p3_fw_dynp.Param(os.path.join(p3_u.pat_dir(), 'data/vehicles/cularis.xml'))
         
 
     def get_eom(self, atm, g=9.81):
@@ -54,17 +68,23 @@ class Glider:
         pos_ned = np.array([self._sxd(self._st), self._sxd(self._st), self._sxd(self._st)])
         vel_ned = np.array([self._sxd(self._st), self._sxd(self._st), self._sxd(self._st)])
         va_ned = vel_ned - atm.get_wind_ned_sym2(self._sx(self._st), self._sy(self._st), self._sz(self._st), self._st)
+        va, alpha, beta = 10, 0, 0
+        fab = self.get_aero_forces_body(va, alpha, beta)
         return [0, 0, 0]
 
-    def get_aero_forces_body(self):
-        CL, CY, CD = self.get_aero_coefs()
+    def get_aero_forces_body(self, va, alpha, beta):
+        CL, CY, CD = self.get_aero_coefs(alpha, beta)
         Pdyn, Sref = 0, 0
+        R_aero_to_body(alpha, beta)
         #return Pdyn*P.Sref*np.dot(p3_fr.R_aero_to_body(alpha, beta), [-CD, CY, -CL])
         return [0, 0, 0]
     
-    def get_aero_coefs(self): 
-        CL, CY, CD = 0, 0, 0
-        return CL, CY, CD
+    def get_aero_coefs(self, alpha, beta): 
+        d_alpha = alpha - self.P.alpha0
+        CL = self.P.CL0 + self.P.CL_alpha*d_alpha + self.P.CL_beta*beta
+        CD = self.P.CD0 + self.P.CD_k1*CL + self.P.CD_k2*(CL**2)
+        CY = self.P.CY_alpha*d_alpha + self.P.CY_beta*beta
+        return [CL, CY, CD]
     
 class Planner:
     def __init__(self,
@@ -172,4 +192,5 @@ def main(force_recompute=False, filename='/tmp/glider3_opty.pkl'):
     plt.show()
     
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     main(force_recompute='-force' in sys.argv)

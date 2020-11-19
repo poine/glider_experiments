@@ -15,9 +15,19 @@ class AtmosphereCalmSym(p3_atm.AtmosphereCalm):
     def get_wind_ned_sym2(self, _x, _y, _z, _t):
         return [0., 0., 0.]
 
+class AtmosphereCstWindSym(p3_atm.AtmosphereCstWind):
+    def get_wind_ned_sym(self, _x, _y, _z, _t):
+        return self.v[2]
+    def get_wind_ned_sym2(self, _x, _y, _z, _t):
+        return self.v
+
 class AtmosphereWharingtonSym(p3_atm.AtmosphereWharington):
     def get_wind_ned_sym(self, _x, _y, _z, _t):
         return  self.strength*sym.exp(-((_x-self.center[0])**2 + (_y-self.center[1])**2)/self.radius**2)
+    def get_wind_ned_sym2(self, _x, _y, _z, _t):
+        wd = self.strength*sym.exp(-((_x-self.center[0])**2 + (_y-self.center[1])**2)/self.radius**2)
+        ret = sym.Array([self.cst[0], self.cst[1], self.cst[2]+wd])
+        return ret#sym.Array(self.cst)#+[0, 0, wd]
 
 class AtmosphereWharingtonArraySym(p3_atm.AtmosphereWharingtonArray):
     def __init__(self, centers, radiuses, strengths):
@@ -27,6 +37,8 @@ class AtmosphereWharingtonArraySym(p3_atm.AtmosphereWharingtonArray):
     def get_wind_ned_sym(self, _x, _y, _z, _t):
         return np.sum([_th.get_wind_ned_sym(_x, _y, _z, _t) for _th in self._thermals])
 
+    def get_wind_ned_sym2(self, _x, _y, _z, _t):
+        return np.sum([_th.get_wind_ned_sym2(_x, _y, _z, _t) for _th in self._thermals])
 
 class AtmosphereRidgeSym(p3_atm.AtmosphereRidge):
     def get_wind_ned_sym(self, _x, _y, _z, _t):
@@ -45,10 +57,19 @@ class AtmosphereRidgeSym(p3_atm.AtmosphereRidge):
         wz = sym.Piecewise((2*self.winf*ceta*seta*R2ovr2, r2 >= self.R2), (0., True))
         return wz
 
-        
+    def get_wind_ned_sym2(self, _x, _y, _z, _t):
+        pos_ned = np.array([_x, _y, _z])
+        dpos = pos_ned - self.c
+        r2 = dpos[0]**2 + dpos[2]**2 
+        eta = -sym.atan2(dpos[2], dpos[0])
+        ceta, seta = sym.cos(eta), sym.sin(eta)
+        R2ovr2 = self.R2/r2
+        wx = self.winf*(1-R2ovr2*(ceta*ceta-seta*seta))
+        wz = sym.Piecewise((2*self.winf*ceta*seta*R2ovr2, r2 >= self.R2), (0., True))
+        return [wx, 0., wz]
     
 def atm2():
-    centers, radiuses, strengths = ([-50, 0, 0], [50, 0, 0]), (25, 25), (-1., -1.)
+    centers, radiuses, strengths = ([-50, 0, 0], [50, 0, 0]), (25, 25), (-1., -1.5)
     return AtmosphereWharingtonArraySym(centers, radiuses, strengths)
     
 #
