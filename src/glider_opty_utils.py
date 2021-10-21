@@ -171,32 +171,34 @@ def glider_sink_rate(va, phi):
 
 
 # Chronograms
-def plot_solution_chronogram(planner):
+def plot_solution_chronogram(planner, max_idx=None):
+    if max_idx is None: max_idx=len(planner.sol_time)
     fig, axes = plt.subplots(3, 2)
-    axes[0,0].plot(planner.sol_time, planner.sol_e)
-    p3_plu.decorate(axes[0,0], 'E', 't in s', 'e in m')
-    axes[1,0].plot(planner.sol_time, planner.sol_n)
-    p3_plu.decorate(axes[1,0], 'N', 't in s', 'n in m')
-    axes[2,0].plot(planner.sol_time, planner.sol_u)
-    p3_plu.decorate(axes[2,0], 'U', 't in s' , 'h in m')
-    axes[0,1].plot(planner.sol_time, np.rad2deg(planner.sol_psi))
-    p3_plu.decorate(axes[0,1], 'psi', 't in s' , 'psi in deg')
-    axes[1,1].plot(planner.sol_time, planner.sol_v)
+    axes[0,0].plot(planner.sol_time[:max_idx], planner.sol_e[:max_idx])
+    p3_plu.decorate(axes[0,0], 'e', 't in s', 'e in m')
+    axes[1,0].plot(planner.sol_time[:max_idx], planner.sol_n[:max_idx])
+    p3_plu.decorate(axes[1,0], 'n', 't in s', 'n in m')
+    axes[2,0].plot(planner.sol_time[:max_idx], planner.sol_u[:max_idx])
+    p3_plu.decorate(axes[2,0], 'u', 't in s' , 'h in m')
+    axes[0,1].plot(planner.sol_time[:max_idx], np.rad2deg(planner.sol_psi[:max_idx]))
+    p3_plu.decorate(axes[0,1], '$\psi$', 't in s' , 'psi in deg')
+    axes[1,1].plot(planner.sol_time[:max_idx], planner.sol_v[:max_idx])
     p3_plu.decorate(axes[1,1], 'v', 't in s' , 'v in m/s')
-    axes[2,1].plot(planner.sol_time, np.rad2deg(planner.sol_phi))
-    p3_plu.decorate(axes[2,1], 'phi', 't in s', 'phi in deg')
+    axes[2,1].plot(planner.sol_time[:max_idx], np.rad2deg(planner.sol_phi[:max_idx]))
+    p3_plu.decorate(axes[2,1], '$\phi$', 't in s', 'phi in deg')
     
 
 
 # 2D horizontal trajectory
 def plot_solution_2D_en(planner, figure=None, ax=None, title=None,  # east north (up)
-                        show_quiver=True, contour_wz=False,):
+                        show_quiver=True, contour_wz=False, max_idx=None):
     figure, ax = p3_plu.plot_slice_wind_ne(planner.atm,
                                            n0=planner._n_constraint[0], n1=planner._n_constraint[1], dn=5.,
                                            e0=planner._e_constraint[0], e1=planner._e_constraint[1], de=5, h0=20., t0=0.,
                                            show_quiver=show_quiver, contour_wz=contour_wz, show_color_bar=True, title=title,
                                            figure=figure, ax=ax)
-    ax.plot(planner.sol_e, planner.sol_n)
+    if max_idx is None: max_idx=len(planner.sol_time)
+    ax.plot(planner.sol_e[:max_idx], planner.sol_n[:max_idx])
     ax.axis('equal')
     return figure, ax
 
@@ -229,10 +231,11 @@ def plot_solution_2D_eu(planner, figure=None, ax=None, title=None,             #
 
 
 # 3D trajectory
-def plot_solution_3D(planner, figure=None, ax=None, title=""):
+def plot_solution_3D(planner, figure=None, ax=None, title="", max_idx=None):
+    if max_idx is None: max_idx=len(planner.sol_time)
     fig = figure if figure is not None else plt.figure()
     ax = ax if ax is not None else fig.add_subplot(111, projection='3d')
-    ax.plot(planner.sol_n, planner.sol_e, planner.sol_u, color='b', label='aircraft trajectory')
+    ax.plot(planner.sol_n[:max_idx], planner.sol_e[:max_idx], planner.sol_u[:max_idx], color='b', label='aircraft trajectory')
     ax.set_xlabel('N axis')
     ax.set_ylabel('E axis')
     ax.set_zlabel('U axis')

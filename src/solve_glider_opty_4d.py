@@ -68,7 +68,7 @@ class Planner:
                  _e_constraint = (-100, 100),
                  e0=-25, n0=0, u0=1, psi0=0,
                  duration=40., hz=50., obj_scale=1.):
-        self.obj_scale = obj_scale
+        self.obj_scale = obj_scale           # objective function scaling
         self.num_nodes = int(duration*hz)+1
         self.interval_value = 1./hz
         self.duration  = (self.num_nodes-1)*self.interval_value#duration
