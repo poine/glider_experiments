@@ -101,7 +101,7 @@ def atm3():
     centers, radiuses, strengths = ([25, -75, 0], [75, 100, 0], [0, 0, 0]), (25, 25, 25), (-0.6, -1.5, -0.9)
     return AtmosphereWharingtonArraySym(centers, radiuses, strengths)
 def atm4():
-    centers, radiuses, strengths = ([25, -75, 0], [75, 250, 0], [0, 0, 0], [75, 100, 0]), (25, 25, 25, 20), (-0.6, -1.4, -0.8, -1.9)
+    centers, radiuses, strengths = ([25, -75, 0], [75, 250, 0], [0, 0, 0], [75, 100, 0]), (25, 25, 25, 20), (-0.6, -1.4, -0.8, -0.6) # last was 1.9
     return AtmosphereWharingtonArraySym(centers, radiuses, strengths)
 
 

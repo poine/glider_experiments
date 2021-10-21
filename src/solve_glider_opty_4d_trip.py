@@ -65,8 +65,9 @@ cc_malt_c = 5.#0.1 # tradeoff between go to waypoint and maximize altitude
 def obj_cc(free, _p):
     dists_to_wp = np.linalg.norm(np.vstack((free[_p._slice_e], free[_p._slice_n])).T - [ccg_e, ccg_n], axis=1)
     cost1 = np.sum(dists_to_wp) / _p.num_nodes                 # average dist to waypoint
-    cost2 = -cc_malt_c*np.sum(free[_p._slice_u])/_p.num_nodes  # average altitude
+    #cost2 = -cc_malt_c*np.sum(free[_p._slice_u])/_p.num_nodes  # average altitude
     #cost2 = -cc_falt_c*free[_p._slice_u][-1]                   # final altitude
+    cost2 = 0.
     return _p.obj_scale * (cost1+cost2)
 
 def obj_grad_cc(free, _p):
@@ -75,12 +76,12 @@ def obj_grad_cc(free, _p):
     dists_to_wp = np.linalg.norm(disps_to_wp, axis=1)
     grad[_p._slice_e] = _p.obj_scale/_p.num_nodes*disps_to_wp[:,0]/dists_to_wp
     grad[_p._slice_n] = _p.obj_scale/_p.num_nodes*disps_to_wp[:,1]/dists_to_wp
-    grad[_p._slice_u] = -_p.obj_scale*cc_malt_c/_p.num_nodes    # average altitude
+    #grad[_p._slice_u] = -_p.obj_scale*cc_malt_c/_p.num_nodes    # average altitude
     #grad[_p._slice_u][-1] = -cc_falt_c*_p.obj_scale             # final altitude
     return grad
 
 
-def test_cc(force_recompute=False, filename='/tmp/glider_opty_4d_cc.npz'):
+def test_cc(force_recompute=False, filename='/home/poine/tmp/glider_opty_4d_cc1.npz'):
      atm = go_u.atm4()
      _p = sgo4d.Planner(_obj_fun=obj_cc, _obj_grad=obj_grad_cc,
                         _atm=atm, e0=-100, n0=0, u0=25, psi0=0,
@@ -91,13 +92,13 @@ def test_cc(force_recompute=False, filename='/tmp/glider_opty_4d_cc.npz'):
                         duration=60, hz=20.)
      #sgo4d.compute_or_load(atm, _p, force_recompute, filename, tol=1e-5, max_iter=2000, initial_guess=None)
      sgo4d.compute_or_load(atm, _p, force_recompute, filename, tol=1e-4, max_iter=1500, initial_guess=None)
-     go_u.plot_solution_chronogram(_p)
-     go_u.plot_solution_2D_en(_p)
-     go_u.plot_solution_3D(_p)
+     go_u.plot_solution_chronogram(_p); plt.savefig('plots/glider_4d_cc1_chrono.png')
+     go_u.plot_solution_2D_en(_p); plt.savefig('plots/glider_4d_cc1_en.png')
+     go_u.plot_solution_3D(_p); plt.savefig('plots/glider_4d_cc1_3D.png')
      plt.show()
 
     
 if __name__ == '__main__':
-    test_trip(force_recompute='-force' in sys.argv)
-    #test_cc(force_recompute='-force' in sys.argv)
+    #test_trip(force_recompute='-force' in sys.argv)
+    test_cc(force_recompute='-force' in sys.argv)
 
