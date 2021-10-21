@@ -83,8 +83,9 @@ def obj_grad_cc(free, _p):
     return grad
 
 
-def test_cc(force_recompute=False, filename='/home/poine/tmp/glider_opty_4d_cc1.npz'):
-     atm = go_u.atm4()
+def test_cc(force_recompute=False, filename='/home/poine/tmp/glider_opty_4d_cc{}.npz', exp='0'):
+     if exp == '0': atm = go_u.atm4(strengths=(-0.6, -1.4, -0.8, -1.9))
+     else: atm = go_u.atm4(strengths=(-0.6, -1.4, -0.8, -0.6))
      _p = sgo4d.Planner(_obj_fun=obj_cc, _obj_grad=obj_grad_cc,
                         _atm=atm, e0=-100, n0=0, u0=25, psi0=0,
                         _v_constraint = (7., 15.),
@@ -93,14 +94,16 @@ def test_cc(force_recompute=False, filename='/home/poine/tmp/glider_opty_4d_cc1.
                         _u_constraint = (   23, 100),
                         duration=60, hz=20.)
      #sgo4d.compute_or_load(atm, _p, force_recompute, filename, tol=1e-5, max_iter=2000, initial_guess=None)
-     sgo4d.compute_or_load(atm, _p, force_recompute, filename, tol=1e-4, max_iter=1500, initial_guess=None)
-     go_u.plot_solution_chronogram(_p); plt.savefig('plots/glider_4d_cc1_chrono.png')
-     go_u.plot_solution_2D_en(_p); plt.savefig('plots/glider_4d_cc1_en.png')
-     go_u.plot_solution_3D(_p); plt.savefig('plots/glider_4d_cc1_3D.png')
+     sgo4d.compute_or_load(atm, _p, force_recompute, filename.format(exp), tol=1e-4, max_iter=1500, initial_guess=None)
+     dists_to_wp = np.linalg.norm(np.vstack((_p.sol_e, _p.sol_n)).T - [ccg_e, ccg_n], axis=1)
+     arrival_idx = np.argmax(dists_to_wp<10)
+     go_u.plot_solution_chronogram(_p, max_idx=arrival_idx); plt.savefig(f'plots/glider_4d_cc{exp}_chrono.png')
+     go_u.plot_solution_2D_en(_p, max_idx=arrival_idx); plt.savefig(f'plots/glider_4d_cc{exp}_en.png')
+     go_u.plot_solution_3D(_p, max_idx=arrival_idx); plt.savefig(f'plots/glider_4d_cc{exp}_3D.png')
      plt.show()
 
     
 if __name__ == '__main__':
-    test_trip(force_recompute='-force' in sys.argv, exp='2')
-    #test_cc(force_recompute='-force' in sys.argv)
+    #test_trip(force_recompute='-force' in sys.argv, exp='2')
+    test_cc(force_recompute='-force' in sys.argv, exp='1')
 

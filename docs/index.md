@@ -117,10 +117,10 @@ The trajectory on figure 4 leans north to find tailwind rather than going straig
 
 If we add a constraint on altitude (forbiding us from hitting ground), we can find a trajectory that hunts thermals along the way.
 <figure>
-  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc_en.png" alt="" width="304" height="228">
-  <!--<img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc_nu.png" alt="" width="304" height="228">-->
-  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc_chrono.png" alt="" width="304" height="228">
-  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc_3D.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc0_en.png" alt="" width="304" height="228">
+  <!--<img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc0_nu.png" alt="" width="304" height="228">-->
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc0_chrono.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_cc0_3D.png" alt="" width="304" height="228">
   <figcaption>Fig5. Cross country</figcaption>
 </figure>
 
