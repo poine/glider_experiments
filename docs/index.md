@@ -93,7 +93,7 @@ The solver returns a convincing trajectory that is similar to the one a human pi
 
 ## 2D Wind field
 
-We can fly to a waypoint by using the average distance to the waypoint as objective function.
+We can fly to a waypoint by using the average distance to the waypoint as objective function ([see](https://github.com/poine/glider_experiments/blob/cc63d823558c6729e6cbb25b2063de7e9b1cb24d/src/solve_glider_opty_4d_trip.py#L22)).
 <figure>
   <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp0_en.png" alt="" width="304" height="228">
   <!--<img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp0_nu.png" alt="" width="304" height="228">-->
