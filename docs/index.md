@@ -110,6 +110,8 @@ We are now able to find an optimal trajectory to a waypoint in a 2D wind gradien
   <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp1_3D.png" alt="" width="304" height="228">
   <figcaption>Fig4. going to waypoint in a 2D wind field</figcaption>
 </figure>
+The trajectory on figure 4 leans north to find tailwind rather than going straight and experiencing headwind.
+
 
 ## Cross country
 
