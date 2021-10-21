@@ -3,6 +3,17 @@ title: Glider experiments
 layout: default
 ---
 <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+$$
+   \newcommand{\vect}[1]{\underline{#1}}
+   \newcommand{\est}[1]{\hat{#1}}
+   \newcommand{\err}[1]{\tilde{#1}}
+   \newcommand{\pd}[2]{\frac{\partial{#1}}{\partial{#2}}}
+   \newcommand{\transp}[1]{#1^{T}}
+   \newcommand{\inv}[1]{#1^{-1}}
+   \newcommand{\norm}[1]{|{#1}|}
+   \newcommand{\mat}[1]{\mathbf{#1}}
+   \newcommand{\jac}[3]{\frac{\partial{#1}}{\partial{#2}}\bigg\vert_{#3}}
+$$
 
 # Optimal glider trajectories using direct collocation method and non-linear programming
 
@@ -10,36 +21,89 @@ layout: default
 
 ## 4D model
 
-$$
-X = \begin{pmatrix} x \\  y \\ z \\ \psi \end{pmatrix}, \quad
-U = \begin{pmatrix} v_a \\ \phi \end{pmatrix}
-$$
+We describe our glider by a simple dimension 4 model ([implementation)](https://github.com/poine/glider_experiments/blob/391521924e6252385f335eeeed672858713927bf/src/solve_glider_opty_4d.py#L41).
+
+$$x, y, z$$ are the coordinates of the glider's center of gravity in an euclidian space, $$v_a$$ is its airspeed, $$\phi$$ and $$\psi$$ are respectively roll and heading angles. $$w_x, w_y, w_z$$ are the wind velocity's components.
+
+Using $$X = \transp{\begin{pmatrix} x &  y & z & \psi \end{pmatrix}}$$ as state vector and $$ U = \transp{\begin{pmatrix} v_a & \phi \end{pmatrix}}$$ as control input, we obtain the following state space representation:
 
 $$
 \begin{align}
 \dot{X} &= f(X, U) \\
-\dot{X} &= \begin{pmatrix} v_a \cos{\psi} + w_x \\ v_a \sin{\psi} + w_y \\ \text{polar}(v_a, \phi) + w_z \\ \frac{g}{v_a} \tan{\phi} \end{pmatrix}
+\begin{pmatrix} \dot{x} \\ \dot{y} \\ \dot{z} \\ \dot{\psi}\end{pmatrix} &= \begin{pmatrix} v_a \cos{\psi} + w_x \\ v_a \sin{\psi} + w_y \\ \dot{z}_a(v_a, \phi) + w_z \\ \frac{g}{v_a} \tan{\phi} \end{pmatrix}
 \end{align}
 $$
 
+Lines 1 and 2 of the dynamics are pure kinematics. Line 3 (reference ardusoaring paper?) is a polynomial model of the glider sink rate as a function of airspeed and bank angle.
 
 $$
-\text{polar}(v_a, \phi) = -v_a(C1+\frac{C_2}{\cos{\phi}})
+CL_0 = \frac{K}{v_a^2}
 $$
+
+
+$$
+\dot{z}_a(v_a, \phi) = -v_a(\frac{CD_0}{CL_0}+\frac{B*CL_0}{\cos{\phi}})
+$$
+
+[implementation](https://github.com/poine/glider_experiments/blob/391521924e6252385f335eeeed672858713927bf/src/glider_opty_utils.py#L158)
+
+The model is fitted in simulation on the trajectories of an aerodynamically correct [simulator](https://github.com/poine/pat) [(see)](https://github.com/poine/pat/blob/0fb0fbfb46e13d030742a8ec61b942eef17e2a54/src/pat3/test/fixed_wing/fit_netto_vario.py). In real life, it would have to be fitted on real flight trajectories (trimmed at different velocities and bank angles).
+
+Line 4 is from a coordinated turn hypothesis (no slip turn).
+
 
 
 ## Thermaling
+
+The thermal is described by a wharignton model:
+
+$$
+   w_z = w_{z0} e^{\frac{-r^2}{r_0^2}}
+$$
+
+
+As objective function, we tested both altitude at end of simulation ($$z(t_f)$$) or average altitude over the simulation ($$\Sigma_{k=0}^n z(t_k)/n$$) ([see](https://github.com/poine/glider_experiments/blob/391521924e6252385f335eeeed672858713927bf/src/solve_glider_opty_4d.py#L26)).
+
+
 <figure>
-  <img src="../plots/glider_4d_thermal_en.png" alt="" width="304" height="228">
-  <img src="../plots/glider_4d_thermal_nu.png" alt="" width="304" height="228">
-  <img src="../plots/glider_4d_thermal_chrono.png" alt="" width="304" height="228">
-  <img src="../plots/glider_4d_thermal_3D.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_thermal_en.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_thermal_nu.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_thermal_chrono.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_thermal_3D.png" alt="" width="304" height="228">
   <figcaption>Fig1.</figcaption>
 </figure>
 
 
 ## Slope soaring
 
+Here we use a simple analytic model of wind blowing across a cylindrical obstacle ([see](https://github.com/poine/glider_experiments/blob/391521924e6252385f335eeeed672858713927bf/src/glider_opty_utils.py#L68)). 
+
+The objective function can be the same as for thermaling (final or mean altitude).
+
+<figure>
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_slope_en.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_slope_nu.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_slope_chrono.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_slope_3D.png" alt="" width="304" height="228">
+  <figcaption>Fig1.</figcaption>
+</figure>
 
 ## 2D Wind field
 
+We can fly to a waypoint by using the average distance to the waypoint as objective function.
+<figure>
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp0_en.png" alt="" width="304" height="228">
+  <!--<img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp0_nu.png" alt="" width="304" height="228">-->
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp0_chrono.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp0_3D.png" alt="" width="304" height="228">
+  <figcaption>Fig1.</figcaption>
+</figure>
+
+We are now able to find an optimal trajectory to a waypoint in a 2D wind gradient.
+<figure>
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp1_en.png" alt="" width="304" height="228">
+  <!--<img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp1_nu.png" alt="" width="304" height="228">-->
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp1_chrono.png" alt="" width="304" height="228">
+  <img src="https://raw.githubusercontent.com/poine/glider_experiments/master/docs/plots/glider_4d_wp1_3D.png" alt="" width="304" height="228">
+  <figcaption>Fig1.</figcaption>
+</figure>
